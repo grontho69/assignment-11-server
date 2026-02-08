@@ -1,4 +1,5 @@
 const express = require('express')
+const cors = require('cors')
 const app = express()
 require('dotenv').config()
 const port = process.env.PORT || 3000
@@ -22,6 +23,32 @@ async function run() {
     // Connect the client 
     await client.connect();
    
+    const db = client.db('assignment-11')
+    const userCollections = db.collection('user')
+
+    //user 
+    app.post('/user', async (req, res) => {
+      const userInfo = req.body;
+      userInfo.role = "doner";
+      userInfo.createdAt = new Date()
+      const result = await userCollections.insertOne(userInfo)
+      res.send(result)
+    })
+
+    app.get('/user/role/:email', async (req, res) => {
+      const {email} = req.params
+      const query = { email: email }
+      const result = await userCollections.findOne(query)
+      res.send(result)
+    })
+
+
+
+
+
+
+
+
 
 
 
