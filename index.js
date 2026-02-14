@@ -25,12 +25,15 @@ async function run() {
    
     const db = client.db('assignment-11')
     const userCollections = db.collection('user')
+    const requestCollections= db.collection('create-request')
 
     //user 
     app.post('/user', async (req, res) => {
       const userInfo = req.body;
-      userInfo.role = "doner";
+      
       userInfo.createdAt = new Date()
+      userInfo.role = 'donor'
+      userInfo.status='active'
       const result = await userCollections.insertOne(userInfo)
       res.send(result)
     })
@@ -43,8 +46,16 @@ async function run() {
     })
 
 
-
-
+    // request
+    
+    app.post('/request', async (req,res) => {
+      const data = req.body
+      const result = await requestCollections.insertOne(data)
+      res.send(result)
+    })
+    app.get('/request', async (req, res) => {
+   
+ })
 
 
 
