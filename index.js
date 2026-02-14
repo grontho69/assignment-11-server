@@ -11,6 +11,11 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })
 
+// const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
