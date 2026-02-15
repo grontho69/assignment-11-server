@@ -46,10 +46,9 @@ async function run() {
         const db = client.db('assignment-11');
         const userCollections = db.collection('user');
         const requestCollections = db.collection('request');
- 
-      //user
-      
-      
+        const fundingCollections = db.collection('funding');
+        const donationCollections = db.collection('donations');
+
         app.post('/user', async (req, res) => {
             const userInfo = req.body;
             userInfo.createdAt = new Date();
@@ -80,10 +79,6 @@ async function run() {
             res.send(result);
         });
 
-      
-      // request
-      
-      
         app.post('/request', verifyFBToken, async (req, res) => {
             const data = req.body;
             const result = await requestCollections.insertOne(data);
@@ -92,8 +87,8 @@ async function run() {
 
         app.get('/my-request', verifyFBToken, async (req, res) => {
             const email = req.decoded_email;
-            const size = Number(req.query.size);
-            const page = Number(req.query.page);
+            const size = Number(req.query.size) || 10;
+            const page = Number(req.query.page) || 0;
             const query = { email: email };
             const result = await requestCollections
                 .find(query)
@@ -106,8 +101,8 @@ async function run() {
 
         app.get('/all-requests', verifyFBToken, async (req, res) => {
             const { status, urgency, page, size } = req.query;
-            const skip = parseInt(page) * parseInt(size);
-            const limit = parseInt(size);
+            const skip = parseInt(page || 0) * parseInt(size || 10);
+            const limit = parseInt(size || 10);
             let query = {};
             if (status && status !== 'All Status') query.donation_status = status.toLowerCase();
             if (urgency && urgency !== 'All Urgencies') query.urgency = urgency.toLowerCase();
@@ -131,7 +126,34 @@ async function run() {
             res.send(result);
         });
 
+        app.get('/funding-campaigns', async (req, res) => {
+            const result = await fundingCollections.find().toArray();
+            res.send(result);
+        });
+
+        app.post('/donate', verifyFBToken, async (req, res) => {
+            const { campaignId, amount } = req.body;
+            const donorEmail = req.decoded_email;
+
+            const donationData = {
+                campaignId: new ObjectId(campaignId),
+                amount: parseInt(amount),
+                donorEmail,
+                date: new Date()
+            };
+            await donationCollections.insertOne(donationData);
+
+            const query = { _id: new ObjectId(campaignId) };
+            const updateDoc = {
+                $inc: { raisedAmount: parseInt(amount) }
+            };
+            
+            const result = await fundingCollections.updateOne(query, updateDoc);
+            res.send(result);
+        });
+
         await client.db("admin").command({ ping: 1 });
+        console.log("Connected to MongoDB");
     } finally {}
 }
 run().catch(console.dir);
