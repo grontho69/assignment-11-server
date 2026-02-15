@@ -3,6 +3,8 @@ const cors = require('cors');
 const app = express();
 require('dotenv').config();
 const port = process.env.PORT || 3000;
+const stripe = require('stripe')(process.env.STRIPE_SC);
+const crypto = require('crypto')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const admin = require("firebase-admin");
 
@@ -151,6 +153,51 @@ async function run() {
             const result = await fundingCollections.updateOne(query, updateDoc);
             res.send(result);
         });
+      
+      // payment
+
+      app.post('/create-payment-checkout', async (req, res) => {
+    try {
+        const information = req.body;
+        
+      
+        const amountInCents = parseInt(information.donateAmount) * 100;
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'usd',
+                        unit_amount: amountInCents, 
+                        product_data: {
+                            name: information.campaignName || 'Donation Campaign',
+                        }
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            customer_email: information.donorEmail, 
+            metadata: {
+                donorName: information.donorName,
+                donorEmail: information.donorEmail,
+                campaignId: information.campaignId 
+            },
+            
+            success_url: `${process.env.SITE_DOMEN }/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.SITE_DOMEN }/payment-cancelled`,
+        });
+
+        res.send({ url: session.url });
+    } catch (error) {
+        console.error("Stripe Session Error:", error);
+        res.status(500).send({ error: "Failed to create Stripe checkout session" });
+    }
+});
+      
+      
+      
 
         await client.db("admin").command({ ping: 1 });
         console.log("Connected to MongoDB");
