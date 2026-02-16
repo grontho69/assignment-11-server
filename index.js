@@ -26,7 +26,7 @@ const verifyFBToken = async (req, res, next) => {
     }
 }
 
-const uri = "mongodb+srv://assignment-11:cqH2wMuYMmT8G8WY@cluster0.pxios99.mongodb.net/?appName=Cluster0";
+const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.pxios99.mongodb.net/?appName=Cluster0`;
 app.use(cors());
 app.use(express.json());
 
@@ -44,7 +44,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        await client.connect();
+   //     await client.connect();
         const db = client.db('assignment-11');
         const userCollections = db.collection('user');
         const requestCollections = db.collection('request');
@@ -71,6 +71,38 @@ async function run() {
             const result = await userCollections.findOne(query);
             res.send(result);
         });
+      
+      // Update user role (Admin only)
+app.patch('/update-user-role/:email', verifyFBToken, async (req, res) => {
+  try {
+    const adminEmail = req.decoded_email;
+    const { role } = req.body; // new role
+    const userEmail = req.params.email;
+
+    // Check if the requester is admin
+    const adminUser = await userCollections.findOne({ email: adminEmail });
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).send({ message: 'Forbidden: Only admins can change roles' });
+    }
+
+    // Prevent invalid role
+    const allowedRoles = ['donor', 'volunteer', 'admin'];
+    if (!allowedRoles.includes(role.toLowerCase())) {
+      return res.status(400).send({ message: 'Invalid role' });
+    }
+
+    const result = await userCollections.updateOne(
+      { email: userEmail },
+      { $set: { role: role.toLowerCase() } }
+    );
+
+    res.send({ message: 'User role updated', result });
+  } catch (err) {
+    console.error("ROLE UPDATE ERROR:", err);
+    res.status(500).send({ message: 'Failed to update role' });
+  }
+});
+
 
         app.patch('/update/user/status/:email', verifyFBToken, async (req, res) => {
             const email = req.params.email;
@@ -219,11 +251,99 @@ async function run() {
         const result = await requestCollections.find(query).toArray()
         res.send(result)
       })
+
+      // dashboard
+
+      app.get('/dashboard-stats', verifyFBToken, async (req, res) => {
+  try {
+    const totalDonors = await userCollections.countDocuments({ role: 'donor' });
+    const totalVolunteers = await userCollections.countDocuments({ role: 'volunteer' });
+
+    const pendingRequests = await requestCollections.countDocuments({
+      donation_status: 'pending'
+    });
+
+    const completedRequests = await requestCollections.countDocuments({
+      donation_status: 'completed'
+    });
+
+    res.send({
+      totalDonors,
+      totalVolunteers,
+      pendingRequests,
+      completedRequests
+    });
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to load stats' });
+  }
+});
+
       
+      app.get('/recent-requests', verifyFBToken, async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || 5;
+
+    const result = await requestCollections
+      .find()
+      .sort({ _id: -1 })   
+      .limit(limit)
+      .toArray();
+
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to load recent requests' });
+  }
+});
+
+      // profile
+
+     app.get('/my-profile', verifyFBToken, async (req, res) => {
+  try {
+    const email = req.decoded_email;
+
+    const user = await userCollections.findOne({ email });
+
+    if (!user) {
+      return res.status(404).send({ message: "User not found" });
+    }
+
+    res.send(user);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Failed to load profile" });
+  }
+});
+
+
+app.patch('/update-profile', verifyFBToken, async (req, res) => {
+  try {
+    const email = req.decoded_email;
+    const updateData = { ...req.body };
+
+    // NEVER update _id
+    delete updateData._id;
+    delete updateData.email; // optionally protect email from changes
+
+    const result = await userCollections.updateOne(
+      { email },
+      { $set: updateData }
+    );
+
+    res.send({ message: 'Profile updated', result });
+  } catch (err) {
+    console.error("UPDATE ERROR:", err);
+    res.status(500).send({ message: "Failed to update profile" });
+  }
+});
+
+
+
+
       
       
 
-        await client.db("admin").command({ ping: 1 });
+ //       await client.db("admin").command({ ping: 1 });
         console.log("Connected to MongoDB");
     } finally {}
 }
