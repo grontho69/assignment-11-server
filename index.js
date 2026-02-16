@@ -194,7 +194,31 @@ async function run() {
         console.error("Stripe Session Error:", error);
         res.status(500).send({ error: "Failed to create Stripe checkout session" });
     }
-});
+      });
+      
+
+      // search
+
+      app.get('/search-request', async (req, res) => {
+        const { blood, district, upazila } = req.query
+       
+        const query = {}
+        if (!query) {
+          return
+        }
+        if (blood) {
+          const fixed = blood.replace(/ /g,"+").trim()
+  query.blood = fixed
+        }
+        if (district) {
+          query.district=district
+        }
+        if (upazila) {
+          query.upazila=upazila
+        }
+        const result = await requestCollections.find(query).toArray()
+        res.send(result)
+      })
       
       
       
